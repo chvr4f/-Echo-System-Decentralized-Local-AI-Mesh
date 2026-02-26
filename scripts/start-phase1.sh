@@ -105,16 +105,11 @@ echo "🤖 Starting Node Agent A (port :9001, ollama :11434)..."
   > "$LOGS/agent-a.log" 2>&1 &
 echo "   pid $! — logs: logs/agent-a.log"
 
-echo "🤖 Starting Node Agent B (port :9002, ollama :11435)..."
-"$ROOT/bin/node-agent.exe" \
-  -id node-b \
-  -port 9002 \
-  -ollama-port 11435 \
-  -models mistral \
-  -capabilities mistral:code,text \
-  -orchestrator http://localhost:8080 \
-  > "$LOGS/agent-b.log" 2>&1 &
-echo "   pid $! — logs: logs/agent-b.log"
+# Node B removed — replaced by Ubuntu VM node (ubuntu-node-1)
+# Start it on your Ubuntu VM with:
+#   ./bin/node-agent -id ubuntu-node-1 -port 9003 -ollama-port 11434 \
+#     -orchestrator http://192.168.1.7:8080 -models mistral \
+#     -capabilities "mistral:code,text"
 
 echo ""
 sleep 2
@@ -140,9 +135,9 @@ echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
 echo "║                    Mesh is running!                      ║"
 echo "╠══════════════════════════════════════════════════════════╣"
-echo "║  Orchestrator:  http://localhost:8080                    ║"
-echo "║  Node A agent:  http://localhost:9001                    ║"
-echo "║  Node B agent:  http://localhost:9002                    ║"
+echo "║  Orchestrator:     http://localhost:8080                 ║"
+echo "║  Node A (local):   http://localhost:9001                 ║"
+echo "║  Ubuntu VM node:   http://192.168.1.9:9003  (manual)    ║"
 echo "╠══════════════════════════════════════════════════════════╣"
 echo "║  Test it:                                                ║"
 echo "║  ./scripts/test-task.sh                                  ║"

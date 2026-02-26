@@ -20,3 +20,16 @@
 2026/02/26 18:41:50 [Orchestrator] Task 17c7bfb0-3b08-4599-a1d0-3749c12da9f4_step_1 type="code" → node node-b (attempt 1)
 2026/02/26 18:43:58 [Pipeline] Step 2 done → node-b (128265ms, 1757 chars)
 2026/02/26 18:43:58 [Pipeline] Completed 17c7bfb0-3b08-4599-a1d0-3749c12da9f4 (2 steps, 131479ms total)
+2026/02/26 19:01:25 [Registry] Routing via tier2 (task type: text)
+2026/02/26 19:01:25 [Orchestrator] Task fb7a6f77-b1d9-4a6b-b85a-a4d0116b3e4f type="text" → node node-a (attempt 1)
+2026/02/26 19:01:32 [Registry] Routing via tier2 (task type: code)
+2026/02/26 19:01:32 [Orchestrator] Task 18d91ec7-8a51-4e76-9f41-b6e3dadfb4a0 type="code" → node node-b (attempt 1)
+2026/02/26 19:01:50 [Pipeline] Starting 5d9bce55-f818-4e3b-a970-2adfee59394b (2 steps)
+2026/02/26 19:01:50 [Pipeline] Step 1/2 — type="text" model=""
+2026/02/26 19:01:50 [Registry] Routing via tier2 (task type: text)
+2026/02/26 19:01:50 [Orchestrator] Task 5d9bce55-f818-4e3b-a970-2adfee59394b_step_0 type="text" → node node-a (attempt 1)
+2026/02/26 19:01:52 [Pipeline] Step 1 done → node-a (2714ms, 145 chars)
+2026/02/26 19:01:52 [Pipeline] Step 2/2 — type="code" model=""
+2026/02/26 19:01:52 [Registry] Routing via tier2 (task type: code)
+2026/02/26 19:01:52 [Orchestrator] Task 5d9bce55-f818-4e3b-a970-2adfee59394b_step_1 type="code" → node node-b (attempt 1)
+2026/02/26 19:02:52 [WS] Dashboard client disconnected (0 remaining)
