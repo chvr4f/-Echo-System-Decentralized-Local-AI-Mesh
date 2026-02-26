@@ -1,0 +1,6 @@
+2026/02/26 16:50:31 [Agent] capabilities flag raw value: "mistral:text,summarize"
+2026/02/26 16:50:31 [Agent] capability: model=mistral types=[text summarize]
+2026/02/26 16:50:31 [Agent:node-a] Starting (agent :9001, ollama :11434)
+2026/02/26 16:50:31 [Agent:node-a] Registered with orchestrator
+2026/02/26 16:50:31 [Agent:node-a] HTTP server on :9001
+2026/02/26 16:50:31 [Agent:node-a] Server error: listen tcp :9001: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.

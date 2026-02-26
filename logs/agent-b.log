@@ -1,0 +1,6 @@
+2026/02/26 16:50:31 [Agent] capabilities flag raw value: "mistral:code,text"
+2026/02/26 16:50:31 [Agent] capability: model=mistral types=[code text]
+2026/02/26 16:50:31 [Agent:node-b] Starting (agent :9002, ollama :11435)
+2026/02/26 16:50:31 [Agent:node-b] Registered with orchestrator
+2026/02/26 16:50:31 [Agent:node-b] HTTP server on :9002
+2026/02/26 16:50:31 [Agent:node-b] Server error: listen tcp :9002: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.
