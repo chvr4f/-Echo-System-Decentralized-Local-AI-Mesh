@@ -71,6 +71,7 @@ type ModelCapability struct {
 // RegisterRequest is sent by a node-agent to the orchestrator on startup.
 type RegisterRequest struct {
 	NodeID       string            `json:"node_id"`
+	AgentHost    string            `json:"agent_host,omitempty"` // hostname/IP for the orchestrator to reach this agent
 	AgentPort    int               `json:"agent_port"`
 	OllamaPort   int               `json:"ollama_port"`
 	Models       []string          `json:"models"`       // kept for backwards compat
@@ -88,6 +89,7 @@ type HeartbeatRequest struct {
 // NodeInfo is how the orchestrator stores a connected node internally.
 type NodeInfo struct {
 	NodeID        string            `json:"node_id"`
+	AgentHost     string            `json:"agent_host"` // hostname/IP to reach this agent (default: localhost)
 	AgentPort     int               `json:"agent_port"`
 	OllamaPort    int               `json:"ollama_port"`
 	Models        []string          `json:"models"`
@@ -164,4 +166,55 @@ type PipelineResult struct {
 	LatencyMs   int64                `json:"latency_ms"`
 	Success     bool                 `json:"success"`
 	Error       string               `json:"error,omitempty"`
+}
+
+// ─── Dashboard / WebSocket Events ─────────────────────────────────────────────
+// Used by the Phase 5 dashboard for real-time mesh updates.
+
+// MeshEvent is a single real-time event pushed to dashboard clients via WS.
+type MeshEvent struct {
+	Type      string `json:"type"`      // event type: task_routed, task_done, node_registered, etc.
+	Timestamp int64  `json:"timestamp"` // unix millis
+	Data      any    `json:"data"`      // event-specific payload
+}
+
+// TaskEvent is the payload for task_routed / task_done / task_failed events.
+type TaskEvent struct {
+	TaskID    string   `json:"task_id"`
+	TaskType  TaskType `json:"task_type"`
+	RoutedTo  string   `json:"routed_to"`
+	ModelUsed string   `json:"model_used,omitempty"`
+	Prompt    string   `json:"prompt,omitempty"`  // first 120 chars
+	Content   string   `json:"content,omitempty"` // first 200 chars (on done)
+	LatencyMs int64    `json:"latency_ms,omitempty"`
+	Success   bool     `json:"success,omitempty"`
+	Error     string   `json:"error,omitempty"`
+}
+
+// NodeEvent is the payload for node_registered / node_offline events.
+type NodeEvent struct {
+	NodeID       string            `json:"node_id"`
+	AgentPort    int               `json:"agent_port,omitempty"`
+	Status       NodeStatus        `json:"status"`
+	ActiveTasks  int               `json:"active_tasks"`
+	Models       []string          `json:"models,omitempty"`
+	Capabilities []ModelCapability `json:"capabilities,omitempty"`
+}
+
+// PipelineEvent is the payload for pipeline_started / pipeline_done events.
+type PipelineEvent struct {
+	PipelineID string `json:"pipeline_id"`
+	TotalSteps int    `json:"total_steps"`
+	StepIndex  int    `json:"step_index,omitempty"`
+	LatencyMs  int64  `json:"latency_ms,omitempty"`
+	Success    bool   `json:"success,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+// DashboardStats is the summary sent on initial WS connection and periodically.
+type DashboardStats struct {
+	TotalTasks     int64   `json:"total_tasks"`
+	TotalPipelines int64   `json:"total_pipelines"`
+	AvgLatencyMs   float64 `json:"avg_latency_ms"`
+	UptimeSecs     int64   `json:"uptime_secs"`
 }

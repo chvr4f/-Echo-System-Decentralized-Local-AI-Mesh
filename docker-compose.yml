@@ -1,0 +1,100 @@
+# docker-compose.yml
+# Phase 6: One-command startup for the entire echo-mesh.
+#
+# Usage:
+#   docker compose up --build           # start everything
+#   docker compose up --build -d        # start detached
+#   docker compose down                 # stop everything
+#
+# Architecture:
+#   orchestrator (:8080) — dashboard at http://localhost:8080/dashboard/
+#   ollama-a (:11434)    — Ollama instance A
+#   ollama-b (:11435)    — Ollama instance B
+#   node-a (:9001)       — Agent A → ollama-a (text, summarize)
+#   node-b (:9002)       — Agent B → ollama-b (code, text)
+
+services:
+  # ── Orchestrator ────────────────────────────────────────────────────────────
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.orchestrator
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Ollama instances ────────────────────────────────────────────────────────
+  ollama-a:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-a-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  ollama-b:
+    image: ollama/ollama:latest
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama-b-data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:11434/api/tags"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # ── Node agents ─────────────────────────────────────────────────────────────
+  node-a:
+    build:
+      context: .
+      dockerfile: Dockerfile.node-agent
+    command:
+      - "-id=node-a"
+      - "-port=9001"
+      - "-ollama-host=ollama-a"
+      - "-ollama-port=11434"
+      - "-orchestrator=http://orchestrator:8080"
+      - "-host=node-a"
+      - "-models=mistral"
+      - "-capabilities=mistral:text,summarize"
+    ports:
+      - "9001:9001"
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+      ollama-a:
+        condition: service_healthy
+
+  node-b:
+    build:
+      context: .
+      dockerfile: Dockerfile.node-agent
+    command:
+      - "-id=node-b"
+      - "-port=9002"
+      - "-ollama-host=ollama-b"
+      - "-ollama-port=11434"
+      - "-orchestrator=http://orchestrator:8080"
+      - "-host=node-b"
+      - "-models=mistral"
+      - "-capabilities=mistral:code,text"
+    ports:
+      - "9002:9002"
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+      ollama-b:
+        condition: service_healthy
+
+volumes:
+  ollama-a-data:
+  ollama-b-data:

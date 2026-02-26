@@ -41,6 +41,23 @@ func main() {
 	// ── Debug / status ───────────────────────────────────────────────────────
 	mux.HandleFunc("GET /status", handleStatus)
 	mux.HandleFunc("GET /debug/routing", handleDebugRouting)
+	// ── Phase 5: Dashboard ─────────────────────────────────────────────
+	mux.HandleFunc("GET /ws", handleWS)
+	mux.Handle("GET /dashboard/", http.StripPrefix("/dashboard/", http.FileServer(http.Dir("dashboard"))))
+	mux.HandleFunc("GET /dashboard", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/dashboard/", http.StatusMovedPermanently)
+	})
+
+	// Start background stats broadcaster
+	StartStatsBroadcast()
+
+	// ── Phase 6: mDNS zero-config discovery ──────────────────────────────────
+	mdnsCleanup, err := startMDNS()
+	if err != nil {
+		log.Printf("[Orchestrator] mDNS advertisement failed (non-fatal): %v", err)
+	} else {
+		defer mdnsCleanup()
+	}
 
 	addr := ":8080"
 	log.Printf("[Orchestrator] Listening on %s", addr)
@@ -77,6 +94,10 @@ func handleTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result.LatencyMs = time.Since(startedAt).Milliseconds()
+
+	// Emit dashboard event
+	EmitTaskDone(result)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
 }
@@ -109,6 +130,10 @@ func routeWithFailover(ctx context.Context, req shared.TaskRequest, tried map[st
 	result.RoutedTo = node.NodeID
 	result.TaskType = req.Type
 	result.Success = true
+
+	// Emit routing event for dashboard
+	EmitTaskRouted(req.TaskID, req.Type, node.NodeID, req.Prompt)
+
 	return result, nil
 }
 
@@ -178,6 +203,10 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	registry.Register(req)
+
+	// Emit dashboard event
+	EmitNodeRegistered(req)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "registered"})
 }
@@ -195,6 +224,10 @@ func handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown node, please re-register", http.StatusNotFound)
 		return
 	}
+
+	// Emit status update for dashboard
+	EmitNodeStatus(req.NodeID, req.Status, req.ActiveTasks)
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -273,7 +306,7 @@ func handlePipeline(w http.ResponseWriter, r *http.Request) {
 // forwardTask sends a task to a node-agent and waits for the full response.
 func forwardTask(ctx context.Context, node *shared.NodeInfo, req shared.TaskRequest) (*shared.TaskResult, error) {
 	body, _ := json.Marshal(req)
-	url := fmt.Sprintf("http://localhost:%d/execute", node.AgentPort)
+	url := fmt.Sprintf("http://%s:%d/execute", node.AgentHost, node.AgentPort)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
@@ -298,7 +331,7 @@ func forwardTask(ctx context.Context, node *shared.NodeInfo, req shared.TaskRequ
 // calling onChunk for each received TaskChunk.
 func forwardTaskStream(ctx context.Context, node *shared.NodeInfo, req shared.TaskRequest, onChunk func(shared.TaskChunk)) error {
 	body, _ := json.Marshal(req)
-	url := fmt.Sprintf("http://localhost:%d/execute/stream", node.AgentPort)
+	url := fmt.Sprintf("http://%s:%d/execute/stream", node.AgentHost, node.AgentPort)
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {

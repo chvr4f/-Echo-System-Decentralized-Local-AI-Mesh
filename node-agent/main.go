@@ -37,7 +37,9 @@ var activeTasks int64
 
 type Config struct {
 	NodeID          string
+	AgentHost       string // hostname/IP this agent is reachable at
 	AgentPort       int    // this agent's HTTP server port
+	OllamaHost      string // Ollama hostname (default: localhost)
 	OllamaPort      int    // local Ollama port
 	OrchestratorURL string
 	Models          []string
@@ -46,14 +48,16 @@ type Config struct {
 
 func main() {
 	// Flags — makes it easy to run two instances with different ports
-	nodeID     := flag.String("id",         "",      "Unique node ID (e.g. node-a)")
-	agentPort  := flag.Int("port",          9001,    "Port this agent listens on")
-	ollamaPort := flag.Int("ollama-port",   11434,   "Local Ollama port")
-	orchURL    := flag.String("orchestrator", "http://localhost:8080", "Orchestrator URL")
-	modelsFlag := flag.String("models",     "mistral", "Comma-separated model names")
+	nodeID := flag.String("id", "", "Unique node ID (e.g. node-a)")
+	agentPort := flag.Int("port", 9001, "Port this agent listens on")
+	ollamaPort := flag.Int("ollama-port", 11434, "Local Ollama port")
+	orchURL := flag.String("orchestrator", "auto", "Orchestrator URL ('auto' = mDNS discovery)")
+	agentHost := flag.String("host", "", "Hostname/IP this agent is reachable at (default: auto-detect)")
+	ollamaHost := flag.String("ollama-host", "localhost", "Ollama hostname (for Docker: service name)")
+	modelsFlag := flag.String("models", "mistral", "Comma-separated model names")
 	// capabilities format: "mistral:text,summarize;codellama:code"
 	// Each entry is "modelname:type1,type2" separated by semicolons.
-	capsFlag   := flag.String("capabilities", "", "Model capabilities, e.g. mistral:text,summarize;codellama:code")
+	capsFlag := flag.String("capabilities", "", "Model capabilities, e.g. mistral:text,summarize;codellama:code")
 	flag.Parse()
 
 	if *nodeID == "" {
@@ -62,17 +66,32 @@ func main() {
 	}
 
 	models := strings.Split(*modelsFlag, ",")
-	caps   := parseCapabilities(*capsFlag, models)
+	caps := parseCapabilities(*capsFlag, models)
 	log.Printf("[Agent] capabilities flag raw value: %q", *capsFlag)
 	for _, c := range caps {
 		log.Printf("[Agent] capability: model=%s types=%v", c.Name, c.Types)
 	}
 
+	// Phase 6: mDNS auto-discovery
+	orchestratorURL := *orchURL
+	if orchestratorURL == "auto" || orchestratorURL == "" {
+		log.Println("[Agent] No orchestrator URL specified — using mDNS discovery")
+		orchestratorURL = discoverOrchestratorWithRetry()
+	}
+
+	// Determine the host this agent is reachable at
+	resolvedHost := *agentHost
+	if resolvedHost == "" {
+		resolvedHost = getPreferredOutboundIP()
+	}
+
 	cfg := Config{
 		NodeID:          *nodeID,
+		AgentHost:       resolvedHost,
 		AgentPort:       *agentPort,
+		OllamaHost:      *ollamaHost,
 		OllamaPort:      *ollamaPort,
-		OrchestratorURL: *orchURL,
+		OrchestratorURL: orchestratorURL,
 		Models:          models,
 		Capabilities:    caps,
 	}
@@ -94,6 +113,7 @@ func main() {
 func registerWithRetry(cfg Config) {
 	req := shared.RegisterRequest{
 		NodeID:       cfg.NodeID,
+		AgentHost:    cfg.AgentHost,
 		AgentPort:    cfg.AgentPort,
 		OllamaPort:   cfg.OllamaPort,
 		Models:       cfg.Models,
@@ -190,7 +210,7 @@ func makeExecuteHandler(cfg Config) http.HandlerFunc {
 		defer atomic.AddInt64(&activeTasks, -1)
 
 		model := resolveModel(cfg, req.ModelHint, req.Type)
-		content, err := callOllama(r.Context(), cfg.OllamaPort, model, req.Prompt, false)
+		content, err := callOllama(r.Context(), cfg.OllamaHost, cfg.OllamaPort, model, req.Prompt, false)
 		if err != nil {
 			result := shared.TaskResult{
 				TaskID:  req.TaskID,
@@ -238,7 +258,7 @@ func makeExecuteStreamHandler(cfg Config) http.HandlerFunc {
 			return
 		}
 
-		err := streamOllama(r.Context(), cfg.OllamaPort, model, req.Prompt, func(token string, done bool) {
+		err := streamOllama(r.Context(), cfg.OllamaHost, cfg.OllamaPort, model, req.Prompt, func(token string, done bool) {
 			chunk := shared.TaskChunk{
 				TaskID: req.TaskID,
 				Token:  token,
@@ -258,9 +278,9 @@ func makeExecuteStreamHandler(cfg Config) http.HandlerFunc {
 // ─── Ollama integration ───────────────────────────────────────────────────────
 
 type ollamaRequest struct {
-	Model   string `json:"model"`
-	Prompt  string `json:"prompt"`
-	Stream  bool   `json:"stream"`
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	Stream bool   `json:"stream"`
 }
 
 type ollamaChunk struct {
@@ -269,9 +289,9 @@ type ollamaChunk struct {
 }
 
 // callOllama sends a prompt to Ollama and returns the full response.
-func callOllama(ctx context.Context, port int, model, prompt string, stream bool) (string, error) {
+func callOllama(ctx context.Context, host string, port int, model, prompt string, stream bool) (string, error) {
 	body, _ := json.Marshal(ollamaRequest{Model: model, Prompt: prompt, Stream: false})
-	url := fmt.Sprintf("http://localhost:%d/api/generate", port)
+	url := fmt.Sprintf("http://%s:%d/api/generate", host, port)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
@@ -297,9 +317,9 @@ func callOllama(ctx context.Context, port int, model, prompt string, stream bool
 }
 
 // streamOllama sends a prompt to Ollama and calls onToken for each streamed token.
-func streamOllama(ctx context.Context, port int, model, prompt string, onToken func(token string, done bool)) error {
+func streamOllama(ctx context.Context, host string, port int, model, prompt string, onToken func(token string, done bool)) error {
 	body, _ := json.Marshal(ollamaRequest{Model: model, Prompt: prompt, Stream: true})
-	url := fmt.Sprintf("http://localhost:%d/api/generate", port)
+	url := fmt.Sprintf("http://%s:%d/api/generate", host, port)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {

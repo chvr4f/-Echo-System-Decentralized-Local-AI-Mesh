@@ -36,6 +36,7 @@ func ExecutePipeline(ctx context.Context, req shared.PipelineRequest) *shared.Pi
 
 	totalStart := time.Now()
 	log.Printf("[Pipeline] Starting %s (%d steps)", req.PipelineID, len(req.Steps))
+	EmitPipelineStarted(req.PipelineID, len(req.Steps))
 
 	results := make([]shared.PipelineStepResult, 0, len(req.Steps))
 	prevOutput := req.InitialInput
@@ -101,7 +102,7 @@ func ExecutePipeline(ctx context.Context, req shared.PipelineRequest) *shared.Pi
 	log.Printf("[Pipeline] Completed %s (%d steps, %dms total)",
 		req.PipelineID, len(req.Steps), time.Since(totalStart).Milliseconds())
 
-	return &shared.PipelineResult{
+	result := &shared.PipelineResult{
 		PipelineID:  req.PipelineID,
 		Steps:       results,
 		FinalOutput: prevOutput,
@@ -109,6 +110,8 @@ func ExecutePipeline(ctx context.Context, req shared.PipelineRequest) *shared.Pi
 		LatencyMs:   time.Since(totalStart).Milliseconds(),
 		Success:     true,
 	}
+	EmitPipelineDone(result)
+	return result
 }
 
 // ─── Template Resolution ──────────────────────────────────────────────────────

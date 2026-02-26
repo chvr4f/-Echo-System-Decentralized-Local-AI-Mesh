@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECHO-SYSTEM — Mesh Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #06090f;
+    --bg-card:   rgba(255,255,255,0.03);
+    --bg-hover:  rgba(255,255,255,0.05);
+    --border:    rgba(255,255,255,0.08);
+    --text:      #f3f4f6;
+    --text-bright: #ffffff;
+    --text-dim:  #d1d5db;
+    --text-muted:#9ca3af;
+    --green:     #34d399;
+    --green-bright: #6ee7b7;
+    --blue:      #60a5fa;
+    --yellow:    #fbbf24;
+    --red:       #f87171;
+    --purple:    #a78bfa;
+    --pink:      #f472b6;
+    --cyan:      #22d3ee;
+    --font-ui:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.6;
+    font-weight: 400;
+    overflow: hidden;
+    height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+  /* Animations */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  @keyframes glow { 0%,100% { box-shadow: 0 0 6px var(--green); } 50% { box-shadow: 0 0 18px var(--green); } }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+  .fade-in { animation: fadeIn .3s ease; }
+  .slide-in { animation: slideIn .25s ease; }
+
+  /* Layout */
+  .shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 16px 24px;
+    gap: 14px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-right { display: flex; gap: 28px; font-size: 14px; font-weight: 500; color: var(--text-dim); }
+  .header-right .stat-item { display: flex; align-items: center; gap: 8px; }
+  .header-right .stat-val { font-weight: 700; font-family: var(--font-mono); font-size: 15px; }
+
+  .live-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--green);
+    animation: glow 2.5s infinite;
+    flex-shrink: 0;
+  }
+  .live-dot.disconnected { background: var(--red); animation: pulse 1s infinite; }
+
+  .title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    color: var(--text-bright);
+  }
+  .subtitle { font-size: 13px; color: var(--text-dim); font-weight: 500; }
+
+  /* Main grid */
+  .main {
+    display: grid;
+    grid-template-columns: 300px 1fr 320px;
+    gap: 14px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* Left column */
+  .left { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .stat-box {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    line-height: 1.2;
+  }
+  .stat-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-top: 6px;
+  }
+
+  /* Node cards */
+  .node-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    transition: border-color .3s, opacity .3s, background .2s;
+  }
+  .node-card:hover { background: var(--bg-hover); }
+  .node-card.offline { opacity: .35; border-color: #1f2937; }
+  .node-card.busy { border-color: rgba(251,191,36,0.3); }
+
+  .node-status-dot {
+    position: absolute; top: 16px; right: 16px;
+    width: 10px; height: 10px; border-radius: 50%;
+    transition: background .3s;
+  }
+
+  .node-id {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-bottom: 3px;
+    font-family: var(--font-mono);
+  }
+  .node-host {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    font-family: var(--font-mono);
+    font-weight: 500;
+  }
+
+  .model-tag {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 5px;
+    background: rgba(96,165,250,0.12);
+    color: var(--blue);
+    border: 1px solid rgba(96,165,250,0.25);
+    margin-right: 6px;
+    margin-bottom: 6px;
+    font-family: var(--font-mono);
+  }
+
+  .cap-tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-right: 5px;
+    margin-bottom: 5px;
+    letter-spacing: 0.5px;
+  }
+
+  .node-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+  }
+
+  /* Load bar */
+  .load-bar-track {
+    height: 4px;
+    background: #1f2937;
+    border-radius: 2px;
+    margin-top: 10px;
+  }
+  .load-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .5s, background .3s;
+  }
+
+  /* Center column */
+  .center { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: hidden; }
+  .nodes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 12px;
+  }
+
+  /* Chat / Task interface */
+  .chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    padding-right: 6px;
+  }
+  .chat-msg {
+    margin-bottom: 10px;
+    font-size: 14px;
+    line-height: 1.7;
+    font-weight: 400;
+    animation: fadeIn .3s ease;
+    word-wrap: break-word;
+  }
+  .chat-msg .prefix {
+    color: var(--text-dim);
+    margin-right: 8px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .chat-msg.user { color: var(--text-bright); font-weight: 500; }
+  .chat-msg.assistant { color: var(--green-bright); }
+  .chat-msg.system { color: var(--text-dim); font-size: 13px; font-weight: 500; }
+  .chat-msg.error { color: var(--red); font-weight: 500; }
+
+  .chat-input-row { display: flex; gap: 10px; flex-shrink: 0; }
+  .chat-input {
+    flex: 1;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 11px 16px;
+    color: var(--text-bright);
+    font-size: 15px;
+    font-weight: 400;
+    font-family: var(--font-ui);
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .chat-input:focus {
+    border-color: rgba(52,211,153,0.5);
+    box-shadow: 0 0 0 2px rgba(52,211,153,0.1);
+  }
+  .chat-input::placeholder { color: #4b5563; }
+
+  .chat-type-select {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .send-btn {
+    background: rgba(52,211,153,0.1);
+    border: 1px solid rgba(52,211,153,0.35);
+    border-radius: 8px;
+    padding: 11px 22px;
+    color: var(--green-bright);
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: background .2s, transform .1s;
+    white-space: nowrap;
+  }
+  .send-btn:hover { background: rgba(52,211,153,0.18); }
+  .send-btn:active { transform: scale(0.97); }
+  .send-btn:disabled { opacity: .35; cursor: default; transform: none; }
+
+  /* Right column — Task feed */
+  .right { display: flex; flex-direction: column; overflow: hidden; }
+  .feed-header {
+    display: grid;
+    grid-template-columns: 72px 60px 1fr 68px;
+    gap: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1.5px;
+    padding-bottom: 8px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .feed-scroll { flex: 1; overflow-y: auto; }
+  .feed-row {
+    display: grid;
+    grid-template-columns: 72px 60px 1fr 68px;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 13px;
+    animation: slideIn .25s ease;
+    align-items: center;
+  }
+  .feed-time {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .feed-type {
+    padding: 3px 10px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .feed-node {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .feed-latency {
+    color: var(--text-dim);
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  /* Topology SVG */
+  .topo-wrap { display: flex; justify-content: center; }
+
+  /* Pipeline indicator */
+  .pipeline-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(167,139,250,0.12);
+    color: var(--purple);
+    border: 1px solid rgba(167,139,250,0.25);
+    margin-left: 8px;
+    letter-spacing: 1px;
+  }
+
+  /* Status indicator */
+  .status-badge {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Empty state */
+  .empty {
+    font-size: 14px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 36px 0;
+    font-weight: 500;
+  }
+
+  /* WS Status */
+  .ws-status {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ws-status .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+</style>
+
+<!-- React 18 from CDN -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- Babel standalone for JSX -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const TYPE_COLORS = {
+  code:      { color: '#34d399', bg: 'rgba(52,211,153,0.12)',   label: 'CODE' },
+  text:      { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   label: 'TEXT' },
+  vision:    { color: '#f472b6', bg: 'rgba(244,114,182,0.12)',  label: 'VISN' },
+  summarize: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',   label: 'SUMM' },
+  embed:     { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)',  label: 'EMBD' },
+};
+
+const STATUS_COLORS = {
+  idle:       '#34d399',
+  busy:       '#fbbf24',
+  overloaded: '#f87171',
+  offline:    '#4b5563',
+};
+
+const CAP_COLORS = {
+  text:      { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',   border: 'rgba(96,165,250,0.25)' },
+  code:      { color: '#34d399', bg: 'rgba(52,211,153,0.1)',   border: 'rgba(52,211,153,0.25)' },
+  vision:    { color: '#f472b6', bg: 'rgba(244,114,182,0.1)',  border: 'rgba(244,114,182,0.25)' },
+  summarize: { color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',   border: 'rgba(251,191,36,0.25)' },
+  embed:     { color: '#a78bfa', bg: 'rgba(167,139,250,0.1)',  border: 'rgba(167,139,250,0.25)' },
+};
+
+function timeStr() {
+  return new Date().toLocaleTimeString('en-US', { hour12: false });
+}
+
+// ─── Topology SVG ─────────────────────────────────────────────────────────────
+
+function MeshTopology({ nodes }) {
+  const cx = 140, cy = 115, r = 82;
+  const all = nodes.length || 1;
+  const positions = nodes.map((_, i) => {
+    const angle = (i / all) * 2 * Math.PI - Math.PI / 2;
+    return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+  });
+
+  return (
+    <svg width="280" height="230" style={{ display: 'block', margin: '0 auto' }}>
+      {/* inter-node mesh lines */}
+      {positions.map((p, i) =>
+        positions.slice(i + 1).map((p2, j) => (
+          <line key={`m${i}-${j}`} x1={p.x} y1={p.y} x2={p2.x} y2={p2.y}
+                stroke="rgba(96,165,250,0.08)" strokeWidth="1" strokeDasharray="3 4" />
+        ))
+      )}
+      {/* orchestrator center */}
+      <circle cx={cx} cy={cy} r={20} fill="rgba(52,211,153,0.06)" stroke="#34d399" strokeWidth="1.5" />
+      <text x={cx} y={cy - 3} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="10" fill="#34d399" fontWeight="700">ORCH</text>
+      <text x={cx} y={cy + 9} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="9" fill="#9ca3af">:8080</text>
+      {/* lines to nodes */}
+      {positions.map((p, i) => {
+        const col = STATUS_COLORS[nodes[i]?.status] || '#4b5563';
+        return <line key={`l${i}`} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke={col + '40'} strokeWidth="1.5" />;
+      })}
+      {/* node circles */}
+      {positions.map((p, i) => {
+        const n = nodes[i];
+        if (!n) return null;
+        const col = STATUS_COLORS[n.status] || '#4b5563';
+        const label = (n.node_id || '').replace('node-', '').toUpperCase() || '?';
+        return (
+          <g key={`n${i}`}>
+            <circle cx={p.x} cy={p.y} r={17} fill={col + '0d'} stroke={col} strokeWidth="1.5" />
+            <text x={p.x} y={p.y - 2} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="10" fill={col} fontWeight="700">{label}</text>
+            <text x={p.x} y={p.y + 10} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="9" fill="#9ca3af">{n.active_tasks}t</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── Node Card ────────────────────────────────────────────────────────────────
+
+function NodeCard({ node }) {
+  const col = STATUS_COLORS[node.status] || '#4b5563';
+  const loadPct = Math.min(node.active_tasks * 20, 100);
+  const allTypes = (node.capabilities || []).flatMap(c => c.types || []);
+
+  return (
+    <div className={`node-card ${node.status === 'offline' ? 'offline' : ''} ${node.status === 'busy' ? 'busy' : ''}`}>
+      <div className="node-status-dot"
+           style={{ background: col, boxShadow: node.status !== 'offline' ? `0 0 10px ${col}` : 'none' }} />
+      <div className="node-host">:{node.agent_port || '?'}</div>
+      <div className="node-id">{node.node_id}</div>
+      <div style={{ margin: '10px 0 8px' }}>
+        {(node.models || []).map(m => <span className="model-tag" key={m}>{m}</span>)}
+      </div>
+      <div>
+        {[...new Set(allTypes)].map(t => {
+          const cc = CAP_COLORS[t] || CAP_COLORS.text;
+          return <span className="cap-tag" key={t} style={{ color: cc.color, background: cc.bg, border: `1px solid ${cc.border}` }}>{t}</span>;
+        })}
+      </div>
+      <div className="load-bar-track">
+        <div className="load-bar-fill" style={{ width: `${loadPct}%`, background: loadPct > 80 ? '#f87171' : loadPct > 40 ? '#fbbf24' : '#34d399' }} />
+      </div>
+      <div className="node-footer">
+        <span>{node.active_tasks} active</span>
+        <span className="status-badge" style={{ color: col }}>{node.status}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Feed Row ─────────────────────────────────────────────────────────────────
+
+function FeedRow({ event }) {
+  const ti = TYPE_COLORS[event.task_type] || TYPE_COLORS.text;
+  return (
+    <div className="feed-row">
+      <span className="feed-time">{event.time}</span>
+      <span className="feed-type" style={{ color: ti.color, background: ti.bg }}>{ti.label}</span>
+      <span className="feed-node">
+        → {event.routed_to}
+        {event.pipeline && <span className="pipeline-badge">PIPE</span>}
+      </span>
+      <span className="feed-latency">{event.latency_ms ? event.latency_ms + 'ms' : '…'}</span>
+    </div>
+  );
+}
+
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
+
+function Dashboard() {
+  const [nodes, setNodes] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [stats, setStats] = useState({ total_tasks: 0, total_pipelines: 0, avg_latency_ms: 0, uptime_secs: 0 });
+  const [connected, setConnected] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatType, setChatType] = useState('text');
+  const [chatMessages, setChatMessages] = useState([]);
+  const [sending, setSending] = useState(false);
+  const chatEndRef = useRef(null);
+  const wsRef = useRef(null);
+  const reconnectRef = useRef(null);
+
+  const wsUrl = (() => {
+    const prot = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return prot + '//' + location.host + '/ws';
+  })();
+
+  const baseUrl = location.protocol + '//' + location.host;
+
+  // ── WebSocket ───────────────────────────────────────────────────────────
+  const handleEvent = useCallback((evt) => {
+    const { type, data } = evt;
+
+    switch (type) {
+      case 'node_registered':
+        setNodes(prev => {
+          const idx = prev.findIndex(n => n.node_id === data.node_id);
+          if (idx >= 0) { const copy = [...prev]; copy[idx] = { ...copy[idx], ...data }; return copy; }
+          return [...prev, data];
+        });
+        break;
+
+      case 'node_status':
+        setNodes(prev => prev.map(n =>
+          n.node_id === data.node_id ? { ...n, status: data.status, active_tasks: data.active_tasks } : n
+        ));
+        break;
+
+      case 'task_routed':
+        setEvents(prev => [{
+          id: Date.now() + Math.random(), time: timeStr(),
+          task_type: data.task_type || 'text', routed_to: data.routed_to,
+          prompt: data.prompt, status: 'running',
+        }, ...prev].slice(0, 100));
+        break;
+
+      case 'task_done':
+        setEvents(prev => {
+          const idx = prev.findIndex(e => e.status === 'running' && e.routed_to === data.routed_to);
+          if (idx >= 0) { const copy = [...prev]; copy[idx] = { ...copy[idx], latency_ms: data.latency_ms, status: 'done' }; return copy; }
+          return [{
+            id: Date.now() + Math.random(), time: timeStr(),
+            task_type: data.task_type || 'text', routed_to: data.routed_to,
+            latency_ms: data.latency_ms, status: 'done',
+          }, ...prev].slice(0, 100);
+        });
+        break;
+
+      case 'pipeline_started':
+        setEvents(prev => [{
+          id: Date.now() + Math.random(), time: timeStr(),
+          task_type: 'text', routed_to: `pipeline (${data.total_steps} steps)`,
+          pipeline: true, status: 'running',
+        }, ...prev].slice(0, 100));
+        break;
+
+      case 'pipeline_done':
+        setEvents(prev => {
+          const idx = prev.findIndex(e => e.pipeline && e.status === 'running');
+          if (idx >= 0) { const copy = [...prev]; copy[idx] = { ...copy[idx], latency_ms: data.latency_ms, status: 'done' }; return copy; }
+          return prev;
+        });
+        break;
+
+      case 'stats':
+        setStats(data);
+        break;
+    }
+  }, []);
+
+  const connectWS = useCallback(() => {
+    if (wsRef.current && wsRef.current.readyState <= 1) return;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setConnected(true);
+      setChatMessages(prev => [...prev, { role: 'system', content: 'WebSocket connected — receiving live events.' }]);
+      if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
+    };
+    ws.onclose = () => { setConnected(false); reconnectRef.current = setTimeout(connectWS, 3000); };
+    ws.onerror = () => ws.close();
+    ws.onmessage = (msg) => { try { handleEvent(JSON.parse(msg.data)); } catch(e) {} };
+  }, [wsUrl, handleEvent]);
+
+  useEffect(() => { connectWS(); return () => { if (wsRef.current) wsRef.current.close(); }; }, [connectWS]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
+
+  // ── Send task ───────────────────────────────────────────────────────────
+  const handleSend = async () => {
+    const prompt = chatInput.trim();
+    if (!prompt || sending) return;
+    setChatInput('');
+    setSending(true);
+    setChatMessages(prev => [...prev, { role: 'user', content: prompt }]);
+
+    try {
+      const resp = await fetch(baseUrl + '/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, type: chatType || undefined }),
+      });
+      const result = await resp.json();
+      if (result.success) {
+        setChatMessages(prev => [...prev,
+          { role: 'system', content: `→ ${result.routed_to} · ${result.model_used} · ${result.latency_ms}ms` },
+          { role: 'assistant', content: result.content },
+        ]);
+      } else {
+        setChatMessages(prev => [...prev, { role: 'error', content: result.error || 'Task failed' }]);
+      }
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'error', content: 'Network error: ' + e.message }]);
+    }
+    setSending(false);
+  };
+
+  // ── Computed ────────────────────────────────────────────────────────────
+  const liveNodes = nodes.filter(n => n.status !== 'offline');
+  const activeCount = nodes.reduce((a, n) => a + (n.active_tasks || 0), 0);
+  const modelSet = [...new Set(nodes.flatMap(n => n.models || []))];
+
+  const formatUptime = (s) => {
+    const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const ss = String(Math.floor(s % 60)).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────
+  return (
+    <div className="shell">
+      {/* HEADER */}
+      <div className="header">
+        <div className="header-left">
+          <div className={`live-dot ${connected ? '' : 'disconnected'}`} />
+          <span className="title">ECHO-SYSTEM</span>
+          <span className="subtitle">/ MESH CONTROL v0.5</span>
+        </div>
+        <div className="header-right">
+          <div className="stat-item">UPTIME <span className="stat-val" style={{ color: 'var(--green)' }}>{formatUptime(stats.uptime_secs || 0)}</span></div>
+          <div className="stat-item">NODES <span className="stat-val" style={{ color: 'var(--green)' }}>{liveNodes.length}/{nodes.length}</span></div>
+          <div className="stat-item">TASKS <span className="stat-val" style={{ color: 'var(--blue)' }}>{stats.total_tasks}</span></div>
+          <div className="stat-item">PIPES <span className="stat-val" style={{ color: 'var(--purple)' }}>{stats.total_pipelines}</span></div>
+          <div className="stat-item">AVG <span className="stat-val" style={{ color: 'var(--yellow)' }}>{Math.round(stats.avg_latency_ms)}ms</span></div>
+        </div>
+      </div>
+
+      {/* MAIN GRID */}
+      <div className="main">
+
+        {/* LEFT: Topology + Stats */}
+        <div className="left">
+          <div className="card">
+            <div className="card-title">Mesh Topology</div>
+            <div className="topo-wrap">
+              <MeshTopology nodes={nodes} />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-title">Stats</div>
+            <div className="stats-grid">
+              <div className="stat-box">
+                <div className="stat-value" style={{ color: 'var(--yellow)' }}>{activeCount}</div>
+                <div className="stat-label">ACTIVE</div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-value" style={{ color: 'var(--purple)' }}>{modelSet.length}</div>
+                <div className="stat-label">MODELS</div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-value" style={{ color: 'var(--blue)' }}>{stats.total_tasks}</div>
+                <div className="stat-label">TOTAL</div>
+              </div>
+              <div className="stat-box">
+                <div className="stat-value" style={{ color: 'var(--green)' }}>{liveNodes.length}</div>
+                <div className="stat-label">ONLINE</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div className="card-title">Connection</div>
+            <div className="ws-status">
+              <span className="dot" style={{ background: connected ? 'var(--green)' : 'var(--red)' }} />
+              {connected ? 'Connected to mesh' : 'Reconnecting…'}
+            </div>
+          </div>
+        </div>
+
+        {/* CENTER: Nodes + Task Input */}
+        <div className="center">
+          <div className="card-title">Connected Nodes</div>
+          <div className="nodes-grid">
+            {nodes.map(n => <NodeCard key={n.node_id} node={n} />)}
+            {nodes.length === 0 && <div className="empty">No nodes registered yet…</div>}
+          </div>
+
+          <div className="card chat-area" style={{ marginTop: 8 }}>
+            <div className="card-title">Task Interface</div>
+            <div className="chat-messages">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`chat-msg ${msg.role}`}>
+                  <span className="prefix">{msg.role === 'user' ? '>' : msg.role === 'assistant' ? '~' : msg.role === 'error' ? '!' : '#'}</span>
+                  {msg.content}
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="chat-input-row">
+              <select className="chat-type-select" value={chatType} onChange={e => setChatType(e.target.value)}>
+                <option value="text">TEXT</option>
+                <option value="code">CODE</option>
+                <option value="summarize">SUMM</option>
+                <option value="vision">VISN</option>
+                <option value="">ANY</option>
+              </select>
+              <input className="chat-input"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSend()}
+                placeholder="Enter a task prompt…"
+                disabled={sending}
+              />
+              <button className="send-btn" onClick={handleSend} disabled={sending || !chatInput.trim()}>
+                {sending ? '…' : 'SEND'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: Task Feed */}
+        <div className="right card">
+          <div className="card-title">Task Feed</div>
+          <div className="feed-header">
+            <span>TIME</span><span>TYPE</span><span>NODE</span><span style={{ textAlign: 'right' }}>LATENCY</span>
+          </div>
+          <div className="feed-scroll">
+            {events.length === 0 && <div className="empty">Waiting for tasks…</div>}
+            {events.map(e => <FeedRow key={e.id} event={e} />)}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<Dashboard />);
+</script>
+</body>
+</html>

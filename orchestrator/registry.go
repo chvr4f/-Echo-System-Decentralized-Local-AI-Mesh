@@ -35,8 +35,13 @@ func (r *Registry) Register(req shared.RegisterRequest) {
 	defer r.mu.Unlock()
 
 	now := time.Now().UnixMilli()
+	agentHost := req.AgentHost
+	if agentHost == "" {
+		agentHost = "localhost"
+	}
 	r.nodes[req.NodeID] = &shared.NodeInfo{
 		NodeID:        req.NodeID,
+		AgentHost:     agentHost,
 		AgentPort:     req.AgentPort,
 		OllamaPort:    req.OllamaPort,
 		Models:        req.Models,
@@ -76,10 +81,10 @@ func (r *Registry) Heartbeat(req shared.HeartbeatRequest) bool {
 // FindBestNode returns the most suitable live node for a task.
 //
 // Phase 3 routing priority:
-//   1. Exact model match   (model_hint specified by client)
-//   2. Task type match     (node has a model that handles this task type)
-//   3. Any available node  (fallback if no type was specified)
-//   4. Fewest active tasks (tiebreaker at each level)
+//  1. Exact model match   (model_hint specified by client)
+//  2. Task type match     (node has a model that handles this task type)
+//  3. Any available node  (fallback if no type was specified)
+//  4. Fewest active tasks (tiebreaker at each level)
 func (r *Registry) FindBestNode(taskType shared.TaskType, modelHint string) (*shared.NodeInfo, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -173,9 +178,10 @@ func (r *Registry) FindBestNodeExcluding(taskType shared.TaskType, modelHint str
 // FindBestNodeExcluding. Must be called with at least a read lock held.
 //
 // Routing tiers (tried in order, picks lowest active_tasks within each tier):
-//   Tier 1: exact model name match (model_hint)
-//   Tier 2: task type match via capabilities
-//   Tier 3: any live node (fallback when type is TaskTypeAny)
+//
+//	Tier 1: exact model name match (model_hint)
+//	Tier 2: task type match via capabilities
+//	Tier 3: any live node (fallback when type is TaskTypeAny)
 func (r *Registry) findBest(taskType shared.TaskType, modelHint string, exclude map[string]bool) (*shared.NodeInfo, error) {
 	isCandidate := func(node *shared.NodeInfo) bool {
 		if exclude != nil && exclude[node.NodeID] {

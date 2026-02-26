@@ -48,7 +48,7 @@ cd "$ROOT"
 mkdir -p bin
 go mod tidy
 go build -o bin/orchestrator.exe ./orchestrator
-go build -o bin/node-agent.exe   ./node-agent
+go build -o bin/node-agent.exe   ./node-agent/main.go ./node-agent/discovery.go
 echo "✅  Binaries built → bin/"
 echo ""
 

@@ -1,23 +1,22 @@
-2026/02/26 17:18:15 [Orchestrator] Listening on :8080
-2026/02/26 17:18:16 [Registry] Node registered: node-a (agent :9001, ollama :11434, models: [mistral])
-2026/02/26 17:18:16 [Registry]   mistral handles: [text summarize]
-2026/02/26 17:18:16 [Registry] Node registered: node-b (agent :9002, ollama :11435, models: [mistral])
-2026/02/26 17:18:16 [Registry]   mistral handles: [code text]
-2026/02/26 17:18:32 [Pipeline] Starting 28fc739b-09b3-4432-96f8-707eda793cde (2 steps)
-2026/02/26 17:18:32 [Pipeline] Step 1/2 — type="text" model=""
-2026/02/26 17:18:32 [Registry] Routing via tier2 (task type: text)
-2026/02/26 17:18:32 [Orchestrator] Task 28fc739b-09b3-4432-96f8-707eda793cde_step_0 type="text" → node node-a (attempt 1)
-2026/02/26 17:19:36 [Pipeline] Step 1 done → node-a (63149ms, 3281 chars)
-2026/02/26 17:19:36 [Pipeline] Step 2/2 — type="summarize" model=""
-2026/02/26 17:19:36 [Registry] Routing via tier2 (task type: summarize)
-2026/02/26 17:19:36 [Orchestrator] Task 28fc739b-09b3-4432-96f8-707eda793cde_step_1 type="summarize" → node node-a (attempt 1)
-2026/02/26 17:19:53 [Pipeline] Step 2 done → node-a (17112ms, 931 chars)
-2026/02/26 17:19:53 [Pipeline] Completed 28fc739b-09b3-4432-96f8-707eda793cde (2 steps, 80279ms total)
-2026/02/26 17:19:53 [Pipeline] Starting df7924d9-ee08-4af7-a834-91a92c444503 (2 steps)
-2026/02/26 17:19:53 [Pipeline] Step 1/2 — type="summarize" model=""
-2026/02/26 17:19:53 [Registry] Routing via tier2 (task type: summarize)
-2026/02/26 17:19:53 [Orchestrator] Task df7924d9-ee08-4af7-a834-91a92c444503_step_0 type="summarize" → node node-a (attempt 1)
-2026/02/26 17:19:58 [Pipeline] Step 1 done → node-a (4694ms, 240 chars)
-2026/02/26 17:19:58 [Pipeline] Step 2/2 — type="code" model=""
-2026/02/26 17:19:58 [Registry] Routing via tier2 (task type: code)
-2026/02/26 17:19:58 [Orchestrator] Task df7924d9-ee08-4af7-a834-91a92c444503_step_1 type="code" → node node-b (attempt 1)
+2026/02/26 18:40:54 [mDNS] Advertising _echo-mesh._tcp on port 8080 (IPs: [192.168.56.1 169.254.54.165 169.254.170.16 192.168.1.7 169.254.197.250 192.168.224.1 172.17.224.1])
+2026/02/26 18:40:54 [mDNS] Broadcasting orchestrator as _echo-mesh._tcp.local.
+2026/02/26 18:40:54 [Orchestrator] Listening on :8080
+2026/02/26 18:40:54 [WS] Dashboard client connected (1 total)
+2026/02/26 18:41:02 [Registry] Node registered: node-a (agent :9001, ollama :11434, models: [mistral])
+2026/02/26 18:41:02 [Registry]   mistral handles: [text summarize]
+2026/02/26 18:41:09 [Registry] Node registered: node-b (agent :9002, ollama :11435, models: [mistral])
+2026/02/26 18:41:09 [Registry]   mistral handles: [code text]
+2026/02/26 18:41:35 [Registry] Routing via tier2 (task type: text)
+2026/02/26 18:41:35 [Orchestrator] Task 6e403843-e934-4e0c-850f-5f4ba3cbd458 type="text" → node node-a (attempt 1)
+2026/02/26 18:41:44 [Registry] Routing via tier2 (task type: code)
+2026/02/26 18:41:44 [Orchestrator] Task 00bb850e-c5d1-4ffa-bea0-242cb838dd7b type="code" → node node-b (attempt 1)
+2026/02/26 18:41:46 [Pipeline] Starting 17c7bfb0-3b08-4599-a1d0-3749c12da9f4 (2 steps)
+2026/02/26 18:41:46 [Pipeline] Step 1/2 — type="text" model=""
+2026/02/26 18:41:46 [Registry] Routing via tier2 (task type: text)
+2026/02/26 18:41:46 [Orchestrator] Task 17c7bfb0-3b08-4599-a1d0-3749c12da9f4_step_0 type="text" → node node-a (attempt 1)
+2026/02/26 18:41:50 [Pipeline] Step 1 done → node-a (3203ms, 123 chars)
+2026/02/26 18:41:50 [Pipeline] Step 2/2 — type="code" model=""
+2026/02/26 18:41:50 [Registry] Routing via tier2 (task type: code)
+2026/02/26 18:41:50 [Orchestrator] Task 17c7bfb0-3b08-4599-a1d0-3749c12da9f4_step_1 type="code" → node node-b (attempt 1)
+2026/02/26 18:43:58 [Pipeline] Step 2 done → node-b (128265ms, 1757 chars)
+2026/02/26 18:43:58 [Pipeline] Completed 17c7bfb0-3b08-4599-a1d0-3749c12da9f4 (2 steps, 131479ms total)

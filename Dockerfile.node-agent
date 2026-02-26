@@ -1,0 +1,17 @@
+# ─── Build stage ──────────────────────────────────────────────────────────────
+FROM golang:1.22-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY shared/ shared/
+COPY node-agent/main.go node-agent/main.go
+COPY node-agent/discovery.go node-agent/discovery.go
+RUN CGO_ENABLED=0 go build -o /node-agent ./node-agent/main.go ./node-agent/discovery.go
+
+# ─── Run stage ────────────────────────────────────────────────────────────────
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+COPY --from=builder /node-agent .
+EXPOSE 9001
+ENTRYPOINT ["./node-agent"]

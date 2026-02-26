@@ -1,8 +1,0 @@
-2026/02/26 17:18:16 [Agent] capabilities flag raw value: "mistral:text,summarize"
-2026/02/26 17:18:16 [Agent] capability: model=mistral types=[text summarize]
-2026/02/26 17:18:16 [Agent:node-a] Starting (agent :9001, ollama :11434)
-2026/02/26 17:18:16 [Agent:node-a] Registered with orchestrator
-2026/02/26 17:18:16 [Agent:node-a] HTTP server on :9001
-2026/02/26 17:18:33 [Agent:node-a] Executing task 28fc739b-09b3-4432-96f8-707eda793cde_step_0
-2026/02/26 17:19:36 [Agent:node-a] Executing task 28fc739b-09b3-4432-96f8-707eda793cde_step_1
-2026/02/26 17:19:53 [Agent:node-a] Executing task df7924d9-ee08-4af7-a834-91a92c444503_step_0
