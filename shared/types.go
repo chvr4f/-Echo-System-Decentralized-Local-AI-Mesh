@@ -60,8 +60,9 @@ const (
 )
 
 // ModelCapability describes a single model and what task types it handles.
-//   {"name":"codellama", "types":["code"]}
-//   {"name":"mistral",   "types":["text","summarize"]}
+//
+//	{"name":"codellama", "types":["code"]}
+//	{"name":"mistral",   "types":["text","summarize"]}
 type ModelCapability struct {
 	Name  string     `json:"name"`
 	Types []TaskType `json:"types"`
@@ -121,4 +122,46 @@ func BestModelForType(caps []ModelCapability, t TaskType) string {
 // CanHandle returns true if this node has any model that handles task type t.
 func CanHandle(caps []ModelCapability, t TaskType) bool {
 	return BestModelForType(caps, t) != ""
+}
+
+// ─── Pipeline Types ───────────────────────────────────────────────────────────
+// Used by the Phase 4 pipeline engine to chain tasks across nodes.
+
+// PipelineStep describes one step in a multi-step pipeline.
+// The prompt_template can include {{prev_output}} and {{initial_input}}.
+type PipelineStep struct {
+	Type           TaskType `json:"type"`                      // routing hint for this step
+	ModelHint      string   `json:"model_hint,omitempty"`      // optional: force a specific model
+	PromptTemplate string   `json:"prompt_template,omitempty"` // template with {{prev_output}}, {{initial_input}}
+}
+
+// PipelineRequest is what a client sends to POST /pipeline.
+type PipelineRequest struct {
+	PipelineID   string         `json:"pipeline_id,omitempty"`
+	Steps        []PipelineStep `json:"steps"`
+	InitialInput string         `json:"initial_input"` // seed text / first prompt
+}
+
+// PipelineStepResult captures the outcome of a single pipeline step.
+type PipelineStepResult struct {
+	StepIndex int      `json:"step_index"`
+	TaskID    string   `json:"task_id"`
+	Type      TaskType `json:"task_type"`
+	RoutedTo  string   `json:"routed_to"`
+	ModelUsed string   `json:"model_used"`
+	Content   string   `json:"content"`
+	LatencyMs int64    `json:"latency_ms"`
+	Success   bool     `json:"success"`
+	Error     string   `json:"error,omitempty"`
+}
+
+// PipelineResult is the full response returned by POST /pipeline.
+type PipelineResult struct {
+	PipelineID  string               `json:"pipeline_id"`
+	Steps       []PipelineStepResult `json:"steps"`
+	FinalOutput string               `json:"final_output"`
+	TotalSteps  int                  `json:"total_steps"`
+	LatencyMs   int64                `json:"latency_ms"`
+	Success     bool                 `json:"success"`
+	Error       string               `json:"error,omitempty"`
 }

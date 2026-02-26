@@ -7,6 +7,13 @@ BASE="http://localhost:8080"
 PASS=0
 FAIL=0
 
+# On MSYS/Git Bash/WSL, the bundled curl can't reach Windows-bound localhost.
+if command -v curl.exe &>/dev/null; then
+  CURL="curl.exe"
+else
+  CURL="curl"
+fi
+
 echo ""
 echo "╔══════════════════════════════════════╗"
 echo "║     ECHO-SYSTEM  Phase 2 Tests       ║"
@@ -31,7 +38,7 @@ check() {
 # ─── Test 1: Both nodes still healthy ────────────────────────────────────────
 
 echo "── Test 1: Both nodes alive and idle ──────────────────────"
-STATUS=$(curl -s "$BASE/status")
+STATUS=$($CURL -s "$BASE/status")
 check "Two nodes registered" "$STATUS" '"node_count":2'
 check "node-a is idle"       "$STATUS" '"node_id":"node-a"'
 check "node-b is idle"       "$STATUS" '"node_id":"node-b"'
@@ -44,7 +51,7 @@ echo "── Test 2: Live load tracking ─────────────�
 echo "   Sending a slow task in background..."
 
 # Use a very long prompt to guarantee the task is still running when we check status
-curl -s -X POST "$BASE/task" \
+$CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Write a very long and detailed technical essay of at least 800 words about distributed systems, covering consensus algorithms, CAP theorem, Byzantine fault tolerance, and real-world examples from Google Spanner, Apache Kafka, and Amazon DynamoDB. Include code examples."}' \
   > /tmp/slow_task_result.json &
@@ -52,7 +59,7 @@ SLOW_PID=$!
 
 sleep 5  # Ollama on CPU takes a few seconds to even start generating
 
-MID_STATUS=$(curl -s "$BASE/status")
+MID_STATUS=$($CURL -s "$BASE/status")
 echo "   Mid-task status:"
 echo "$MID_STATUS" | python3 -c "
 import json, sys
@@ -75,14 +82,14 @@ echo "── Test 3: Parallel tasks spread across nodes ────────
 echo "   Sending 6 tasks simultaneously..."
 
 for i in $(seq 1 6); do
-  curl -s -X POST "$BASE/task" \
+  $CURL -s -X POST "$BASE/task" \
     -H "Content-Type: application/json" \
     -d "{\"prompt\": \"Say only the number $i\"}" \
     > /tmp/task_$i.json &
 done
 
 sleep 1
-PARALLEL_STATUS=$(curl -s "$BASE/status")
+PARALLEL_STATUS=$($CURL -s "$BASE/status")
 echo "   Status during parallel load:"
 echo "$PARALLEL_STATUS" | python3 -c "
 import json, sys
@@ -135,7 +142,7 @@ fi
 echo "   Waiting 5s for orchestrator to detect node-b as offline..."
 sleep 5
 
-STATUS_AFTER=$(curl -s "$BASE/status")
+STATUS_AFTER=$($CURL -s "$BASE/status")
 echo "   Status after kill:"
 echo "$STATUS_AFTER" | python3 -c "
 import json, sys
@@ -145,7 +152,7 @@ for n in data.get('nodes', []):
 " 2>/dev/null
 
 echo "   Sending task — should route to node-a only..."
-FAILOVER_RESULT=$(curl -s -X POST "$BASE/task" \
+FAILOVER_RESULT=$($CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Say only: failover works"}')
 echo "   Result: $FAILOVER_RESULT"
@@ -170,7 +177,7 @@ echo "   Restarting node-b..."
 echo "   Waiting 5s for node-b to re-register..."
 sleep 5
 
-STATUS_RECONNECT=$(curl -s "$BASE/status")
+STATUS_RECONNECT=$($CURL -s "$BASE/status")
 check "node-b re-registered" "$STATUS_RECONNECT" '"node_id":"node-b"'
 
 echo "   Status after reconnect:"
@@ -186,7 +193,7 @@ echo ""
 
 echo "── Test 6: Request completes within timeout ───────────────"
 START_T=$SECONDS
-TIMEOUT_RESULT=$(curl -s --max-time 10 -X POST "$BASE/task" \
+TIMEOUT_RESULT=$($CURL -s --max-time 10 -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Say yes"}')
 END_T=$SECONDS

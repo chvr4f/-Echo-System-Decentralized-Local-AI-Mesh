@@ -17,6 +17,13 @@ BASE="http://localhost:8080"
 PASS=0
 FAIL=0
 
+# On MSYS/Git Bash/WSL, the bundled curl can't reach Windows-bound localhost.
+if command -v curl.exe &>/dev/null; then
+  CURL="curl.exe"
+else
+  CURL="curl"
+fi
+
 echo ""
 echo "╔══════════════════════════════════════╗"
 echo "║     ECHO-SYSTEM  Phase 3 Tests       ║"
@@ -27,7 +34,7 @@ check() {
   local label="$1"
   local result="$2"
   local expect="$3"
-  if echo "$result" | grep -q "$expect"; then
+  if echo "$result" | grep -qF "$expect"; then
     echo "  ✅  $label"
     PASS=$((PASS+1))
   else
@@ -41,7 +48,7 @@ check() {
 # ─── Test 1: Mesh status shows capabilities ───────────────────────────────────
 
 echo "── Test 1: Capabilities registered ───────────────────────"
-STATUS=$(curl -s "$BASE/status")
+STATUS=$($CURL -s "$BASE/status")
 check "Capabilities present in status"  "$STATUS" '"capabilities"'
 check "node-a has text capability"      "$STATUS" '"types":["text","summarize"]'
 check "node-b has code capability"      "$STATUS" '"types":["code","text"]'
@@ -50,7 +57,7 @@ echo ""
 # ─── Test 2: Code task routes to node-b ──────────────────────────────────────
 
 echo "── Test 2: Code task → node-b ─────────────────────────────"
-RESULT=$(curl -s -X POST "$BASE/task" \
+RESULT=$($CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Write a Go function that reverses a string.", "type": "code"}')
 echo "   Routed to: $(echo $RESULT | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('routed_to','?'))" 2>/dev/null)"
@@ -64,7 +71,7 @@ echo ""
 # ─── Test 3: Summarize task routes to node-a ─────────────────────────────────
 
 echo "── Test 3: Summarize task → node-a ────────────────────────"
-RESULT=$(curl -s -X POST "$BASE/task" \
+RESULT=$($CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Summarize in one sentence: Distributed systems are complex.", "type": "summarize"}')
 echo "   Routed to: $(echo $RESULT | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('routed_to','?'))" 2>/dev/null)"
@@ -78,7 +85,7 @@ echo ""
 echo "── Test 4: Text tasks load-balanced across both nodes ─────"
 NODES_USED=""
 for i in 1 2 3 4; do
-  R=$(curl -s -X POST "$BASE/task" \
+  R=$($CURL -s -X POST "$BASE/task" \
     -H "Content-Type: application/json" \
     -d "{\"prompt\": \"Say only the word hello\", \"type\": \"text\"}")
   NODE=$(echo $R | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('routed_to','?'))" 2>/dev/null)
@@ -94,7 +101,7 @@ echo ""
 # ─── Test 5: No-type task falls back to any node ─────────────────────────────
 
 echo "── Test 5: No type specified → any node ───────────────────"
-RESULT=$(curl -s -X POST "$BASE/task" \
+RESULT=$($CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Say yes"}')
 check "No-type task succeeds"    "$RESULT" '"success":true'
@@ -104,7 +111,7 @@ echo ""
 # ─── Test 6: Exact model_hint still works ────────────────────────────────────
 
 echo "── Test 6: Explicit model_hint bypasses type routing ──────"
-RESULT=$(curl -s -X POST "$BASE/task" \
+RESULT=$($CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Say only: model hint works", "model_hint": "mistral"}')
 check "model_hint task succeeds" "$RESULT" '"success":true'
@@ -115,7 +122,7 @@ echo ""
 
 echo "── Test 7: Streaming code task → node-b ───────────────────"
 echo "   Tokens received:"
-CHUNKS=$(curl -s -N -X POST "$BASE/task/stream" \
+CHUNKS=$($CURL -s -N -X POST "$BASE/task/stream" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Write a one-line Python hello world", "type": "code"}' \
   --max-time 60)

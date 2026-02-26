@@ -30,8 +30,9 @@ func main() {
 	mux := http.NewServeMux()
 
 	// ── Client-facing endpoints ──────────────────────────────────────────────
-	mux.HandleFunc("POST /task", handleTask)           // non-streaming
+	mux.HandleFunc("POST /task", handleTask)              // non-streaming
 	mux.HandleFunc("POST /task/stream", handleTaskStream) // streaming SSE
+	mux.HandleFunc("POST /pipeline", handlePipeline)      // Phase 4: multi-step pipeline
 
 	// ── Node-agent endpoints ─────────────────────────────────────────────────
 	mux.HandleFunc("POST /register", handleRegister)
@@ -233,6 +234,38 @@ func handleDebugRouting(w http.ResponseWriter, r *http.Request) {
 		"routing": routing,
 		"nodes":   registry.AllNodes(),
 	})
+}
+
+// ─── Client: POST /pipeline ───────────────────────────────────────────────────
+// Executes a multi-step pipeline, chaining outputs across nodes.
+
+func handlePipeline(w http.ResponseWriter, r *http.Request) {
+	var req shared.PipelineRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Steps) == 0 {
+		http.Error(w, "pipeline must have at least one step", http.StatusBadRequest)
+		return
+	}
+	if req.InitialInput == "" {
+		http.Error(w, "initial_input is required", http.StatusBadRequest)
+		return
+	}
+
+	// Use the per-request context with pipeline-level timeout
+	// (each step already gets the task timeout via routeWithFailover)
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(len(req.Steps))*taskTimeout)
+	defer cancel()
+
+	result := ExecutePipeline(ctx, req)
+
+	w.Header().Set("Content-Type", "application/json")
+	if !result.Success {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	json.NewEncoder(w).Encode(result)
 }
 
 // ─── Forwarding helpers ───────────────────────────────────────────────────────

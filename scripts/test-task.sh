@@ -7,6 +7,13 @@ BASE="http://localhost:8080"
 PASS=0
 FAIL=0
 
+# On MSYS/Git Bash/WSL, the bundled curl can't reach Windows-bound localhost.
+if command -v curl.exe &>/dev/null; then
+  CURL="curl.exe"
+else
+  CURL="curl"
+fi
+
 echo ""
 echo "╔══════════════════════════════════════╗"
 echo "║     ECHO-SYSTEM  Phase 1 Tests       ║"
@@ -34,7 +41,7 @@ check() {
 # ─── Test 1: Orchestrator health ──────────────────────────────────────────────
 
 echo "── Test 1: Orchestrator is up ─────────────────────────────"
-STATUS=$(curl -s "$BASE/status")
+STATUS=$($CURL -s "$BASE/status")
 check "Orchestrator responds" "$STATUS" "node_count"
 check "Nodes are registered"  "$STATUS" "node-a"
 echo ""
@@ -43,7 +50,7 @@ echo ""
 
 echo "── Test 2: Non-streaming task ─────────────────────────────"
 echo "   Sending: 'Say hello in one word'"
-RESULT=$(curl -s -X POST "$BASE/task" \
+RESULT=$($CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Say hello in exactly one word. Reply with only that word."}')
 echo "   Response: $RESULT"
@@ -56,7 +63,7 @@ echo ""
 # ─── Test 3: Routing to specific node ─────────────────────────────────────────
 
 echo "── Test 3: Route to node-a specifically ───────────────────"
-RESULT=$(curl -s -X POST "$BASE/task" \
+RESULT=$($CURL -s -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Say the number 1. Reply with only: 1", "model_hint": "mistral"}')
 check "Routed correctly" "$RESULT" '"success":true'
@@ -69,13 +76,13 @@ echo "   Sending 4 quick tasks in parallel..."
 
 RESULTS=""
 for i in 1 2 3 4; do
-  RES=$(curl -s -X POST "$BASE/task" \
+  RES=$($CURL -s -X POST "$BASE/task" \
     -H "Content-Type: application/json" \
     -d "{\"prompt\": \"Say the number $i. Reply with only: $i\"}") &
 done
 wait
 
-STATUS2=$(curl -s "$BASE/status")
+STATUS2=$($CURL -s "$BASE/status")
 echo "   Mesh status after load test:"
 echo "$STATUS2" | python3 -c "
 import json, sys
@@ -90,7 +97,7 @@ echo ""
 echo "── Test 5: Streaming task ─────────────────────────────────"
 echo "   Streaming: 'Count from 1 to 5'"
 echo "   Tokens received:"
-curl -s -N -X POST "$BASE/task/stream" \
+$CURL -s -N -X POST "$BASE/task/stream" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Count from 1 to 5. Use spaces between numbers."}' \
   | head -20 \
@@ -116,7 +123,7 @@ PASS=$((PASS+1)) # count streaming test as pass if we got here
 # ─── Test 6: No node available ────────────────────────────────────────────────
 
 echo "── Test 6: Graceful error on unknown model ─────────────────"
-RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/task" \
+RESULT=$($CURL -s -o /dev/null -w "%{http_code}" -X POST "$BASE/task" \
   -H "Content-Type: application/json" \
   -d '{"prompt": "test", "model_hint": "nonexistent-model-xyz"}')
 check "Returns 503 when no node available" "$RESULT" "503"

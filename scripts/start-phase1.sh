@@ -122,7 +122,13 @@ sleep 2
 # ─── Verify ───────────────────────────────────────────────────────────────────
 
 echo "🔍 Checking mesh status..."
-STATUS=$(curl -s http://localhost:8080/status 2>/dev/null)
+# On MSYS/Git Bash/WSL, the bundled curl can't reach Windows-bound localhost.
+if command -v curl.exe &>/dev/null; then
+  CURL="curl.exe"
+else
+  CURL="curl"
+fi
+STATUS=$($CURL -s http://localhost:8080/status 2>/dev/null)
 if [ -z "$STATUS" ]; then
   echo "⚠️  Orchestrator not responding yet. Check logs/orchestrator.log"
 else
